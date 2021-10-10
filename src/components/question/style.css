@@ -1,0 +1,6 @@
+.ant-checkbox-group-item {
+  display: block !important;
+  margin-right: 0;
+  text-align: left;
+  display: flex !important;
+}
