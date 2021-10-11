@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Form, Input, Button, Affix, Alert, Checkbox } from "antd";
+import { Form, Input, Button, Affix, Alert, Checkbox, Radio } from "antd";
 import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import { PlusCircleOutlined, QuestionOutlined } from "@ant-design/icons";
 import { v4 as uuidv4 } from 'uuid';
@@ -33,10 +33,11 @@ const DynamicFieldSet = () => {
   const [questionType, setQuestionType] = useState('text');
   const onFinish = (values) => {
     values.answers = values.answers ?? [];
-    console.log("Received values of form:", values);
     values.id = uuidv4();
     socket.emit('newQuestion', { ...values, roomId, type: questionType });
-    // setanswer([...answer, values]);
+    const newAnswer = answer;
+    newAnswer.push({ ...values, type: questionType })
+    setanswer(answer => newAnswer);
     setIsShow(false);
   };
 
@@ -49,13 +50,12 @@ const DynamicFieldSet = () => {
     socket.emit('newAnswer', { value: e.target.anwser.value, roomId })
     const questionList = [...answer];
     questionList[questionList.length - 1].answers.push(e.target.anwser.value);
-    setanswer(questionList);
+    setanswer(answer => questionList);
     e.target.reset();
   }
 
   useEffect(() => {
     const host = query.get('isHost');
-    console.log(host === 'true');
     setIsHost(host === 'true');
 
     // lấy info user
@@ -65,15 +65,17 @@ const DynamicFieldSet = () => {
     socket.emit('join', { roomId })
 
     socket.on('newQuestion', data => {
-      console.log('new qa', data);
-      setanswer([...answer, data]);
+      setanswer(answer => [
+        ...answer,
+        data
+      ]);
     })
 
     socket.on('newAnswer', data => {
-      console.log(answer);
-      const questionList = [...answer]
-      questionList[questionList.length - 1].answers.push(data.value);
-      setanswer(answer => questionList);
+      setanswer(answer => [
+        ...answer.slice(0, -2),
+        ...answer.slice(-1).answers.push(data.value)
+      ]);
     })
 
   }, []);
@@ -93,17 +95,26 @@ const DynamicFieldSet = () => {
       {answer?.map((e, i) => (
         <>
           <Alert message={`${i + 1} : ${e?.question}`} type="info" />
-          { e.type === 'text' ?
+          {e.type === 'text' &&
             <div>
               {e?.answers?.map(a => (
                 <div className="text-left" >{a}</div>
               ))}
-            </div> : 
+            </div>
+          }
+          {e.type === 'checkbox' && 
             (<Checkbox.Group
               options={e?.answers?.map((a) => {
                 return { value: a, label: a };
               })}
-            />)            
+            />) 
+          }
+          {e.type === 'radio' && 
+            (<Radio.Group
+              options={e?.answers?.map((a) => {
+                return { value: a, label: a };
+              })}
+            />) 
           }
         </>
       ))}
