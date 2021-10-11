@@ -7,9 +7,15 @@ import { useQuery } from '../../hooks/useQuery'
 import socket from "../../services/socket";
 import "./style.css";
 import { Select } from "antd";
+import { useDispatch } from "react-redux";
+import { setToken, setUserInfo } from '../../app/slices/authSlice';
+import { getProfile, getUsersInfo } from "../../services/user";
+import { useSelector } from "react-redux";
 
 const DynamicFieldSet = () => {
   const { Option } = Select;
+  const dispatch = useDispatch();
+  const authUser = useSelector(state => state.auth.user);
 
   const [answer, setanswer] = useState([
     {
@@ -28,6 +34,8 @@ const DynamicFieldSet = () => {
   ]);
   const query = useQuery();
   const roomId = query.get('room');
+  const [participants, setParticipants] = useState([]);
+  const [participantsList, setParticipantsList] = useState({});
   const [isShow, setIsShow] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [questionType, setQuestionType] = useState('text');
@@ -55,14 +63,31 @@ const DynamicFieldSet = () => {
   }
 
   useEffect(() => {
+    async function getParticipantProfile() {
+      const { data } = await getUsersInfo({ ids: participants });
+      setParticipantsList(data);
+    }
+
+    if (participants.length > 0) {
+      getParticipantProfile();
+    }
+
+  }, [participants]);
+
+  useEffect(() => {
     const host = query.get('isHost');
     setIsHost(host === 'true');
 
     // lấy info user
     const token = query.get('token');
+    dispatch(setToken(token));
 
-    // room_id
-    socket.emit('join', { roomId })
+    async function getUserInfo() {
+      const { data } = await getProfile();
+      dispatch(setUserInfo(data));
+      socket.emit('join', { roomId, user: data.id, isHost: host === 'true' })
+    }
+    getUserInfo();
 
     socket.on('newQuestion', data => {
       setanswer(answer => [
@@ -72,156 +97,194 @@ const DynamicFieldSet = () => {
     })
 
     socket.on('newAnswer', data => {
-      setanswer(answer => [
-        ...answer.slice(0, -2),
-        ...answer.slice(-1).answers.push(data.value)
-      ]);
+      console.log(answer);
+      // setanswer(answer => [
+      //   ...answer.slice(0, -2),
+      //   ...answer.slice(-1).answers.push(data.value)
+      // ]);
+    })
+
+    socket.on('participantsInRoom', data => {
+      console.log('data', data)
+      setParticipants(participants => data);
     })
 
   }, []);
 
   return (
-    <div
-      style={{ width: 800, maxWidth: "100%", padding: 10, margin: "0 auto" }}
-    >
-      {isHost &&
-        <Affix offsetTop={10}>
-          <Button onClick={() => setIsShow(!isShow)}>
-            <PlusCircleOutlined />
-            <QuestionOutlined />
-          </Button>
-        </Affix>}
-      <h1>Danh sách câu hỏi</h1>
-      {answer?.map((e, i) => (
-        <>
-          <Alert message={`${i + 1} : ${e?.question}`} type="info" />
-          {e.type === 'text' &&
-            <div>
-              {e?.answers?.map(a => (
-                <div className="text-left" >{a}</div>
-              ))}
+    <div className="flex justify-between mx-10" >
+      <div >
+        
+        {isHost && (
+          <>
+            <div className="font-bold" >Danh sách câu hỏi của room</div>
+            <div className="text-left" >
+              {answer.map((e,i) => (
+              <div key={i} >{i+1}. {e.question}</div>
+              ))} 
             </div>
-          }
-          {e.type === 'checkbox' && 
-            (<Checkbox.Group
-              options={e?.answers?.map((a) => {
-                return { value: a, label: a };
-              })}
-            />) 
-          }
-          {e.type === 'radio' && 
-            (<Radio.Group
-              options={e?.answers?.map((a) => {
-                return { value: a, label: a };
-              })}
-            />) 
-          }
-        </>
-      ))}
-
-      {(isShow && isHost) && (
-        <Form layout="horizontal" name="dynamic_form_item" onFinish={onFinish}>
-          <h1>Câu hỏi</h1>
-          <Select
-            defaultValue={`Loại câu trả lời`}
-            className="w-12"
-            onChange={handleQuestionTypeChange}
-          >
-            <Option value="text" >Trả lời</Option>
-            <Option value="radio" >Một Lựa chọn</Option>
-            <Option value="checkbox" >Nhiều lựa chọn</Option>
-          </Select>
-          <Form.Item
-            name="question"
-            rules={[
-              {
-                required: true,
-                message: "Vui lòng điền câu hỏi",
-              },
-            ]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.List
-            name="answers"
-            rules={[
-              {
-                validator: async (_, names) => {
-                  if (questionType !== 'text') {
-                    if (!names || names.length < 1) {
-                      return Promise.reject(
-                        new Error("Ít nhất phải có 1 đáp án")
-                      );
-                    }
-                  }
-                },
-              },
-            ]}
-          >
-            {(fields, { add, remove }, { errors }) => (
-              <>
-                <h1>Câu trả lời</h1>
-                {fields.map((field, index) => (
-                  <Form.Item
-                    // label={index === 0 ? "Câu trả lời" : ""}
-                    required={false}
-                    key={field.key}
-                  >
-                    <Form.Item
-                      {...field}
-                      validateTrigger={["onChange", "onBlur"]}
-                      rules={[
-                        {
-                          required: true,
-                          whitespace: true,
-                          message:
-                            "Please input passenger's name or delete this field.",
-                        },
-                      ]}
-                      noStyle
-                    >
-                      <Input
-                        placeholder="passenger name"
-                      // style={{ width: "60%" }}
-                      />
-                    </Form.Item>
-                    {fields.length > 1 ? (
-                      <MinusCircleOutlined
-                        className="dynamic-delete-button"
-                        onClick={() => remove(field.name)}
-                      />
-                    ) : null}
-                  </Form.Item>
-                ))}
-                <Form.Item>
-                  <Button
-                    type="dashed"
-                    onClick={() => add()}
-                    style={{ width: "60%" }}
-                    icon={<PlusOutlined />}
-                  >
-                    Add field
-                  </Button>
-
-                  <Form.ErrorList errors={errors} />
-                </Form.Item>
-              </>
-            )}
-          </Form.List>
-          <Form.Item>
-            <Button type="primary" htmlType="submit">
-              Tạo
+          </>
+        )}
+      </div>
+      <div
+        style={{ width: 800, maxWidth: "100%", padding: 10, margin: "0 auto" }}
+      >
+        {isHost &&
+          <Affix offsetTop={10}>
+            <Button onClick={() => setIsShow(!isShow)}>
+              <PlusCircleOutlined />
+              <QuestionOutlined />
             </Button>
-          </Form.Item>
-        </Form>
-      )}
-      <form onSubmit={handleAnwserFormSubmit} >
-        <input
-          name="anwser"
-          style={{ width: '50%'}}
-          placeholder="Thêm câu trả lời"
-        />
-      </form>
+          </Affix>}
+        <h1>Câu hỏi</h1>
+        <>
+            <Alert message={`${answer.length} : ${answer[answer.length - 1]?.question}`} type="info" />
+            {answer[answer.length - 1].type === 'text' &&
+              <div>
+                {answer[answer.length - 1]?.answers?.map(a => (
+                  <div className="text-left" >{a}</div>
+                ))}
+              </div>
+            }
+            {answer[answer.length - 1].type === 'checkbox' &&
+              (<Checkbox.Group
+                options={answer[answer.length - 1]?.answers?.map((a) => {
+                  return { value: a, label: a };
+                })}
+              />)
+            }
+            {answer[answer.length - 1].type === 'radio' &&
+              (<Radio.Group
+                options={answer[answer.length - 1]?.answers?.map((a) => {
+                  return { value: a, label: a };
+                })}
+              />)
+            }
+          </>
+
+        {(isShow && isHost) && (
+          <Form layout="horizontal" name="dynamic_form_item" onFinish={onFinish}>
+            <h1>Câu hỏi</h1>
+            <Select
+              defaultValue={`Loại câu trả lời`}
+              className="!w-20"
+              onChange={handleQuestionTypeChange}
+            >
+              <Option value="text" >Trả lời</Option>
+              <Option value="radio" >Một Lựa chọn</Option>
+              <Option value="checkbox" >Nhiều lựa chọn</Option>
+            </Select>
+            <Form.Item
+              name="question"
+              rules={[
+                {
+                  required: true,
+                  message: "Vui lòng điền câu hỏi",
+                },
+              ]}
+            >
+              <Input />
+            </Form.Item>
+            <Form.List
+              name="answers"
+              rules={[
+                {
+                  validator: async (_, names) => {
+                    if (questionType !== 'text') {
+                      if (!names || names.length < 1) {
+                        return Promise.reject(
+                          new Error("Ít nhất phải có 1 đáp án")
+                        );
+                      }
+                    }
+                  },
+                },
+              ]}
+            >
+              {(fields, { add, remove }, { errors }) => (
+                <>
+                  <h1>Câu trả lời</h1>
+                  {fields.map((field, index) => (
+                    <Form.Item
+                      // label={index === 0 ? "Câu trả lời" : ""}
+                      required={false}
+                      key={field.key}
+                    >
+                      <Form.Item
+                        {...field}
+                        validateTrigger={["onChange", "onBlur"]}
+                        rules={[
+                          {
+                            required: true,
+                            whitespace: true,
+                            message:
+                              "Please input passenger's name or delete this field.",
+                          },
+                        ]}
+                        noStyle
+                      >
+                        <Input
+                          placeholder="passenger name"
+                        // style={{ width: "60%" }}
+                        />
+                      </Form.Item>
+                      {fields.length > 1 ? (
+                        <MinusCircleOutlined
+                          className="dynamic-delete-button"
+                          onClick={() => remove(field.name)}
+                        />
+                      ) : null}
+                    </Form.Item>
+                  ))}
+                  <Form.Item>
+                    <Button
+                      type="dashed"
+                      onClick={() => add()}
+                      style={{ width: "60%" }}
+                      icon={<PlusOutlined />}
+                    >
+                      Add field
+                    </Button>
+
+                    <Form.ErrorList errors={errors} />
+                  </Form.Item>
+                </>
+              )}
+            </Form.List>
+            <Form.Item>
+              <Button type="primary" htmlType="submit">
+                Tạo
+              </Button>
+            </Form.Item>
+          </Form>
+        )}
+        <form onSubmit={handleAnwserFormSubmit} >
+          <input
+            name="anwser"
+            style={{ width: '50%' }}
+            placeholder="Thêm câu trả lời"
+          />
+        </form>
+      </div>
+      <div>
+        <div>Danh sách người tham gia</div>
+        <ul>
+          {participants.map(id => (
+            <li key={id}>
+              <button
+                className="rounded-md mt-2 px-2 py-2 cursor-pointer flex items-center"
+              >
+                <img
+                  src={participantsList[id]?.avatar}
+                  alt="avatar"
+                  className="h-8 w-8 rounded-full"
+                />
+                <span className="ml-2">{participantsList[id]?.fullname}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 };
