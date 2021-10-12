@@ -11,6 +11,7 @@ import { useDispatch } from "react-redux";
 import { setToken, setUserInfo } from "../../app/slices/authSlice";
 import { getProfile, getUsersInfo } from "../../services/user";
 import { useSelector } from "react-redux";
+import download from 'downloadjs';
 
 const DynamicFieldSet = () => {
   const { Option } = Select;
@@ -62,6 +63,14 @@ const DynamicFieldSet = () => {
     e.target.reset();
   };
 
+  const handleDownloadQuestionList = () => {
+    let str = '';
+    answer.forEach((item, index) => {
+      str += `Câu ${index + 1}: ${item.question}` + '\n' + `${item.answers.length} người trả lời` + '\n'
+    })
+    download(new Blob([str]), "questionsList.txt", "text/plain");
+  }
+
   useEffect(() => {
     async function getParticipantProfile() {
       const { data } = await getUsersInfo({ ids: participants });
@@ -92,25 +101,20 @@ const DynamicFieldSet = () => {
     getUserInfo();
 
     socket.on("newQuestion", (data) => {
-      let latestAnswer;
-      setanswer((answer) => {
-        latestAnswer = answer;
-        return answer;
-      });
-      // biến latestAnswer là mới nhất rồi đó ông, xử lý đi nha
       setanswer((answer) => [...answer, data]);
     });
 
     socket.on("newAnswer", (data) => {
-      console.log(answer);
-      // setanswer(answer => [
-      //   ...answer.slice(0, -2),
-      //   ...answer.slice(-1).answers.push(data.value)
-      // ]);
+      let latestAnswer;
+      setanswer((answer) => {
+        latestAnswer = JSON.parse(JSON.stringify(answer));
+        // latestAnswer[latestAnswer.length - 1].answers.push(data.value);
+        latestAnswer[latestAnswer.length - 1].answers.push(data.value);
+        return latestAnswer;
+      });
     });
 
     socket.on("participantsInRoom", (data) => {
-      console.log("data", data);
       setParticipants((participants) => data);
     });
   }, []);
@@ -121,6 +125,14 @@ const DynamicFieldSet = () => {
         {isHost && (
           <>
             <div className="font-bold">Danh sách câu hỏi của room</div>
+            <div>
+              <button 
+                className="my-2 px-4 py-2 bg-indigo-600 rounded-md text-white focus:outline-none"
+                onClick={handleDownloadQuestionList}
+              >
+                Tải xuống tất cả
+              </button>
+            </div>
             <div className="text-left">
               {answer.map((e, i) => (
                 <div key={i}>
@@ -128,6 +140,7 @@ const DynamicFieldSet = () => {
                 </div>
               ))}
             </div>
+            
           </>
         )}
       </div>
