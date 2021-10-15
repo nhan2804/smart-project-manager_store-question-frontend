@@ -11,7 +11,8 @@ import { useDispatch } from "react-redux";
 import { setToken, setUserInfo } from "../../app/slices/authSlice";
 import { getProfile, getUsersInfo } from "../../services/user";
 import { useSelector } from "react-redux";
-import download from 'downloadjs';
+import download from "downloadjs";
+import getQueryString from "helpers/getQueryString";
 
 const DynamicFieldSet = () => {
   const { Option } = Select;
@@ -34,6 +35,7 @@ const DynamicFieldSet = () => {
     },
   ]);
   const query = useQuery();
+
   const roomId = query.get("room");
   const [participants, setParticipants] = useState([]);
   const [participantsList, setParticipantsList] = useState({});
@@ -45,7 +47,12 @@ const DynamicFieldSet = () => {
   const onFinish = (values) => {
     values.answers = values.answers ?? [];
     values.id = uuidv4();
-    socket.emit("newQuestion", { ...values, roomId, type: questionType, choice: [] });
+    socket.emit("newQuestion", {
+      ...values,
+      roomId,
+      type: questionType,
+      choice: [],
+    });
     const newAnswer = answer;
     newAnswer.push({ ...values, type: questionType, choice: [] });
     setanswer((answer) => newAnswer);
@@ -54,10 +61,14 @@ const DynamicFieldSet = () => {
 
   const onFinishAnswer = (values) => {
     const typeAnswer = answer[answer.length - 1]?.type;
-    console.log(values['anwser']);
-    socket.emit("newAnswer", { type: typeAnswer, value: values['anwser'], roomId });
+    console.log(values["anwser"]);
+    socket.emit("newAnswer", {
+      type: typeAnswer,
+      value: values["anwser"],
+      roomId,
+    });
     setIsAnswered(true);
-  }
+  };
 
   const handleQuestionTypeChange = (e) => {
     setQuestionType(e);
@@ -65,25 +76,35 @@ const DynamicFieldSet = () => {
 
   const handleAnwserFormSubmit = (e) => {
     e.preventDefault();
-    socket.emit("newAnswer", { type: 'text', value: e.target.anwser.value, roomId });
+    socket.emit("newAnswer", {
+      type: "text",
+      value: e.target.anwser.value,
+      roomId,
+    });
     e.target.reset();
     setIsAnswered(true);
   };
 
   const handleDownloadQuestionList = () => {
-    let str = '';
+    let str = "";
     answer.forEach((item, index) => {
-      if(item.type === 'text') {
-        str += `Câu ${index + 1}: ${item.question}` + '\n' + `${item.answers.length} lượt trả lời` + '\n';
+      if (item.type === "text") {
+        str +=
+          `Câu ${index + 1}: ${item.question}` +
+          "\n" +
+          `${item.answers.length} lượt trả lời` +
+          "\n";
       } else {
-        str += `Câu ${index + 1}: ${item.question}` + '\n';
-        const totalAnwser = item.choice.reduce((a,b) => Number.isInteger(b) ? a + b : a , 0);
-        str += `${totalAnwser} lượt bình chọn` + '\n';
+        str += `Câu ${index + 1}: ${item.question}` + "\n";
+        const totalAnwser = item.choice.reduce(
+          (a, b) => (Number.isInteger(b) ? a + b : a),
+          0
+        );
+        str += `${totalAnwser} lượt bình chọn` + "\n";
       }
-      
-    })
+    });
     download(new Blob([str]), "questionsList.txt", "text/plain");
-  }
+  };
 
   useEffect(() => {
     async function getParticipantProfile() {
@@ -99,12 +120,16 @@ const DynamicFieldSet = () => {
   // const questionRef = useRef(null);
   // questionRef.current = answer?.answers;
   // định dùng Ref mà có cách kia rồi
+
   useEffect(() => {
     const host = query.get("isHost");
+    alert(host);
     setIsHost(host === "true");
-
+    const token = getQueryString("token", window.location.href);
+    // alert(qs);
     // lấy info user
-    const token = query.get("token");
+    // const token = query.get("token");
+    // alert(token);
     dispatch(setToken(token));
 
     async function getUserInfo() {
@@ -116,29 +141,36 @@ const DynamicFieldSet = () => {
 
     socket.on("newQuestion", (data) => {
       setanswer((answer) => [...answer, data]);
-      setIsAnswered(isAnswered => false);
+      setIsAnswered((isAnswered) => false);
     });
 
     socket.on("newAnswer", (data) => {
       let latestAnswer;
       setanswer((answer) => {
         latestAnswer = JSON.parse(JSON.stringify(answer));
-        if (data.type === 'text') {
+        if (data.type === "text") {
           latestAnswer[latestAnswer.length - 1].answers.push(data.value);
-        } else if(data.type === 'radio') {
-          const indexAnswer = latestAnswer[latestAnswer.length - 1].answers.indexOf(data.value);
-          if(indexAnswer !== -1) {
-            const amount = latestAnswer[latestAnswer.length - 1].choice[indexAnswer] ?? 0;
-            latestAnswer[latestAnswer.length - 1].choice[indexAnswer] = Number(amount) + 1;
+        } else if (data.type === "radio") {
+          const indexAnswer = latestAnswer[
+            latestAnswer.length - 1
+          ].answers.indexOf(data.value);
+          if (indexAnswer !== -1) {
+            const amount =
+              latestAnswer[latestAnswer.length - 1].choice[indexAnswer] ?? 0;
+            latestAnswer[latestAnswer.length - 1].choice[indexAnswer] =
+              Number(amount) + 1;
           }
         } else {
-          data.value.forEach(item => {
-            const indexAnswer = latestAnswer[latestAnswer.length - 1].answers.indexOf(item);
-            if(indexAnswer !== -1) {
-              const amount = latestAnswer[latestAnswer.length - 1].choice[indexAnswer] ?? 0;
-              latestAnswer[latestAnswer.length - 1].choice[indexAnswer] = Number(amount) + 1;
+          data.value.forEach((item) => {
+            const indexAnswer =
+              latestAnswer[latestAnswer.length - 1].answers.indexOf(item);
+            if (indexAnswer !== -1) {
+              const amount =
+                latestAnswer[latestAnswer.length - 1].choice[indexAnswer] ?? 0;
+              latestAnswer[latestAnswer.length - 1].choice[indexAnswer] =
+                Number(amount) + 1;
             }
-          })
+          });
         }
         return latestAnswer;
       });
@@ -170,7 +202,6 @@ const DynamicFieldSet = () => {
                 </div>
               ))}
             </div>
-
           </>
         )}
       </div>
@@ -188,8 +219,9 @@ const DynamicFieldSet = () => {
         <h1>Câu hỏi</h1>
         <>
           <Alert
-            message={`${answer.length} : ${answer[answer.length - 1]?.question
-              }`}
+            message={`${answer.length} : ${
+              answer[answer.length - 1]?.question
+            }`}
             type="info"
           />
           {answer[answer.length - 1].type === "text" && (
@@ -208,41 +240,38 @@ const DynamicFieldSet = () => {
               )}
             </div>
           )}
-          <Form
-            layout="horizontal"
-            onFinish={onFinishAnswer}
-          >
-
+          <Form layout="horizontal" onFinish={onFinishAnswer}>
             {answer[answer.length - 1].type === "checkbox" && (
-              <Form.Item
-                name="anwser"
-              >
+              <Form.Item name="anwser">
                 <Checkbox.Group
                   options={answer[answer.length - 1]?.answers?.map((a, i) => {
-                    return { 
-                      value: a, 
-                      label: `${a} (${answer[answer.length - 1]?.choice[i] ?? 0} lượt bình chọn)` 
+                    return {
+                      value: a,
+                      label: `${a} (${
+                        answer[answer.length - 1]?.choice[i] ?? 0
+                      } lượt bình chọn)`,
                     };
                   })}
                 />
               </Form.Item>
             )}
             {answer[answer.length - 1].type === "radio" && (
-              <Form.Item
-                name="anwser"
-              >
-                  <Radio.Group>
-                    {answer[answer.length - 1]?.answers?.map((a, i) => {
-                      return (
+              <Form.Item name="anwser">
+                <Radio.Group>
+                  {answer[answer.length - 1]?.answers?.map((a, i) => {
+                    return (
                       <div>
-                        <Radio value={a}>{a} ({ answer[answer.length - 1]?.choice[i] ?? 0 } lượt bình chọn)</Radio>
-                      </div>);
-                    })}
-                  </Radio.Group>
-                  
+                        <Radio value={a}>
+                          {a} ({answer[answer.length - 1]?.choice[i] ?? 0} lượt
+                          bình chọn)
+                        </Radio>
+                      </div>
+                    );
+                  })}
+                </Radio.Group>
               </Form.Item>
             )}
-            {!isAnswered && (answer[answer.length - 1].type !== "text") && (
+            {!isAnswered && answer[answer.length - 1].type !== "text" && (
               <Form.Item>
                 <Button type="primary" htmlType="submit">
                   Gửi câu trả lời
@@ -319,7 +348,7 @@ const DynamicFieldSet = () => {
                       >
                         <Input
                           placeholder="passenger name"
-                        // style={{ width: "60%" }}
+                          // style={{ width: "60%" }}
                         />
                       </Form.Item>
                       {fields.length > 1 ? (
@@ -370,7 +399,7 @@ const DynamicFieldSet = () => {
           ))}
         </ul>
       </div>
-    </div >
+    </div>
   );
 };
 export default DynamicFieldSet;
