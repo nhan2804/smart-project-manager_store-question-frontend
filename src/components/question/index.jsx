@@ -1,5 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Form, Input, Button, Affix, Alert, Checkbox, Radio } from "antd";
+import {
+  Form,
+  Input,
+  Button,
+  Affix,
+  Alert,
+  Checkbox,
+  Radio,
+  Avatar,
+  Tooltip,
+} from "antd";
 import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import { PlusCircleOutlined, QuestionOutlined } from "@ant-design/icons";
 import { v4 as uuidv4 } from "uuid";
@@ -123,12 +133,12 @@ const DynamicFieldSet = () => {
 
   useEffect(() => {
     const host = query.get("isHost");
-    alert(host);
+
     setIsHost(host === "true");
-    const token = getQueryString("token", window.location.href);
+    // const token = getQueryString("token", window.location.href);
     // alert(qs);
     // lấy info user
-    // const token = query.get("token");
+    const token = query.get("token");
     // alert(token);
     dispatch(setToken(token));
 
@@ -216,71 +226,85 @@ const DynamicFieldSet = () => {
             </Button>
           </Affix>
         )}
-        <h1>Câu hỏi</h1>
-        <>
-          <Alert
-            message={`${answer.length} : ${
-              answer[answer.length - 1]?.question
-            }`}
-            type="info"
-          />
-          {answer[answer.length - 1].type === "text" && (
-            <div>
-              {answer[answer.length - 1]?.answers?.map((a) => (
-                <div className="text-left">{a}</div>
-              ))}
-              {!isAnswered && (
-                <form onSubmit={handleAnwserFormSubmit}>
-                  <input
-                    name="anwser"
-                    style={{ width: "50%" }}
-                    placeholder="Thêm câu trả lời"
-                  />
-                </form>
+        {true && (
+          <>
+            <h1>Câu hỏi</h1>
+            <>
+              <Alert
+                message={`${answer.length} : ${
+                  answer[answer.length - 1]?.question
+                }`}
+                type="info"
+              />
+              {answer[answer.length - 1].type === "text" && (
+                <div>
+                  {answer[answer.length - 1]?.answers?.map((a) => (
+                    <div className="text-left">{a}</div>
+                  ))}
+                  {!isAnswered && (
+                    <div className="text-left">
+                      <form
+                        className="space-y-2"
+                        onSubmit={handleAnwserFormSubmit}
+                      >
+                        <input
+                          className="border mt-2 h-10 block"
+                          name="anwser"
+                          style={{ width: "50%" }}
+                          placeholder="Thêm câu trả lời"
+                        />
+                        <Button className="block" type="primary">
+                          Trả lời
+                        </Button>
+                      </form>
+                    </div>
+                  )}
+                </div>
               )}
-            </div>
-          )}
-          <Form layout="horizontal" onFinish={onFinishAnswer}>
-            {answer[answer.length - 1].type === "checkbox" && (
-              <Form.Item name="anwser">
-                <Checkbox.Group
-                  options={answer[answer.length - 1]?.answers?.map((a, i) => {
-                    return {
-                      value: a,
-                      label: `${a} (${
-                        answer[answer.length - 1]?.choice[i] ?? 0
-                      } lượt bình chọn)`,
-                    };
-                  })}
-                />
-              </Form.Item>
-            )}
-            {answer[answer.length - 1].type === "radio" && (
-              <Form.Item name="anwser">
-                <Radio.Group>
-                  {answer[answer.length - 1]?.answers?.map((a, i) => {
-                    return (
-                      <div>
-                        <Radio value={a}>
-                          {a} ({answer[answer.length - 1]?.choice[i] ?? 0} lượt
-                          bình chọn)
-                        </Radio>
-                      </div>
-                    );
-                  })}
-                </Radio.Group>
-              </Form.Item>
-            )}
-            {!isAnswered && answer[answer.length - 1].type !== "text" && (
-              <Form.Item>
-                <Button type="primary" htmlType="submit">
-                  Gửi câu trả lời
-                </Button>
-              </Form.Item>
-            )}
-          </Form>
-        </>
-
+              <Form layout="horizontal" onFinish={onFinishAnswer}>
+                {answer[answer.length - 1].type === "checkbox" && (
+                  <Form.Item name="anwser">
+                    <Checkbox.Group
+                      options={answer[answer.length - 1]?.answers?.map(
+                        (a, i) => {
+                          return {
+                            value: a,
+                            label: `${a} (${
+                              answer[answer.length - 1]?.choice[i] ?? 0
+                            } lượt bình chọn)`,
+                          };
+                        }
+                      )}
+                    />
+                  </Form.Item>
+                )}
+                {answer[answer.length - 1].type === "radio" && (
+                  <Form.Item name="anwser">
+                    <Radio.Group>
+                      {answer[answer.length - 1]?.answers?.map((a, i) => {
+                        return (
+                          <div>
+                            <Radio value={a}>
+                              {a} ({answer[answer.length - 1]?.choice[i] ?? 0}{" "}
+                              lượt bình chọn)
+                            </Radio>
+                          </div>
+                        );
+                      })}
+                    </Radio.Group>
+                  </Form.Item>
+                )}
+                {!isAnswered && answer[answer.length - 1].type !== "text" && (
+                  <Form.Item>
+                    <Button type="primary" htmlType="submit">
+                      Gửi câu trả lời
+                    </Button>
+                  </Form.Item>
+                )}
+              </Form>
+            </>
+          </>
+        )}
         {isShow && isHost && (
           <Form
             layout="horizontal"
@@ -290,7 +314,7 @@ const DynamicFieldSet = () => {
             <h1>Câu hỏi</h1>
             <Select
               defaultValue={`Loại câu trả lời`}
-              className="!w-20"
+              className="!w-20 !m-2"
               onChange={handleQuestionTypeChange}
             >
               <Option value="text">Trả lời</Option>
@@ -340,8 +364,7 @@ const DynamicFieldSet = () => {
                           {
                             required: true,
                             whitespace: true,
-                            message:
-                              "Please input passenger's name or delete this field.",
+                            message: "Vui lòng nhập câu trả lời hoặc xóa nó.",
                           },
                         ]}
                         noStyle
@@ -366,7 +389,7 @@ const DynamicFieldSet = () => {
                       style={{ width: "60%" }}
                       icon={<PlusOutlined />}
                     >
-                      Add field
+                      Thêm câu trả lời
                     </Button>
 
                     <Form.ErrorList errors={errors} />
@@ -382,7 +405,7 @@ const DynamicFieldSet = () => {
           </Form>
         )}
       </div>
-      <div>
+      {/* <div>
         <div>Danh sách người tham gia</div>
         <ul>
           {participants.map((id) => (
@@ -398,6 +421,21 @@ const DynamicFieldSet = () => {
             </li>
           ))}
         </ul>
+      </div> */}
+      <div className="fixed bottom-2 left-2">
+        {participants.map((id) => (
+          <Avatar.Group
+            maxCount={10}
+            maxStyle={{ color: "#f56a00", backgroundColor: "#fde3cf" }}
+          >
+            <Tooltip title={participantsList[id]?.fullname} placement="top">
+              <Avatar
+                src={participantsList[id]?.avatar}
+                style={{ backgroundColor: "#87d068" }}
+              />
+            </Tooltip>
+          </Avatar.Group>
+        ))}
       </div>
     </div>
   );
